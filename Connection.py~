@@ -1,0 +1,10 @@
+#!/bin/python3
+
+from pymongo import MongoClient
+
+client = MongoClient('mongodb://localhost:27117')
+
+db = client.ace
+
+print(db.user.find({blocked:true}).count())
+
