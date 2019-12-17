@@ -60,19 +60,19 @@ class MongoDriver:
         self.user.update_many(query,values)
         self.replicate()
 
-    def create_user(self,mac,msg,note,site):
+    def create_user(self,user):
         """Function that inserts user objects into the database"""
-        user = {
-            "mac": mac,
-            "msg": msg,
-            "note": note,
-            "site_id": site,
+        newUser = {
+            "mac": user['mac'],
+            "msg": user['msg'],
+            "note": user['note'],
+            "site_id": user['site'],
             "noted": True,
             "blocked": True,
             "autoblocked": True
         }
-        print("Inserting "+user)
-#        self.db.user.insert_one(user)
+        print("Inserting "+newUser)
+        self.db.user.insert_one(newUser)
 
     def query(self,mac):
         """function that returns an array of user objects matching a mac address query against the user collection"""
@@ -169,10 +169,12 @@ class MongoDriver:
         package = {
             "mac": int_mac,
             "keys": {
-                "blocked": True,
-                "autoblocked": True,
-                "noted": True,
-                "note": e[ 'msg' ]
+                "$set": {
+                    "blocked": True,
+                    "autoblocked": True,
+                    "noted": True,
+                    "note": e[ 'msg' ]
+                }
             }
         }
         return package
@@ -208,8 +210,14 @@ class MongoDriver:
             for mac in uniq_macs:
                 print("Checking that site "+siteDic[self.id_str(site)]+" contains mac "+mac)
                 if not site_macs.__contains__(mac):
-                    self.create_user( self.find_user( { "blocked": True, "mac": mac, "site_id": self.id_str( site ) } ) )
-                    print("Adding mac "+mac+" to site "+siteDic[self.id_str(site)])
+                    userObj = self.find_user( { "blocked": True, "mac": mac, "site_id": self.id_str( site ) } )
+                    if userObj is None:
+                        print("[ERROR]: find_user returned NoneType for "+mac)
+                        continue
+                    else:
+                        breakpoint()
+                        self.create_user( userObj )
+                        print("Adding mac "+mac+" to site "+siteDic[self.id_str(site)])
         
     def stats(self):
         """Prints useful database stats"""
@@ -242,7 +250,9 @@ class MongoDriver:
                 "mac": mac
             },
             {
-                "note": "Unblocked on "+date,
+                "$set": {
+                    "note": "Unblocked on "+date,
+                },
                 "$unset": {
                     "blocked": "",
                     "autoblocked": ""
@@ -250,6 +260,10 @@ class MongoDriver:
             }
         )
         return result
+
+    def reset_ips_tags(self):
+        #code to scrape all current 'autoblocked' tags
+        pass
 
     def to_array(self,cursor):
         """Method for transforming the MongoClient cursor into an array of json objects to be easily handled"""
@@ -264,7 +278,7 @@ class MongoDriver:
             "_id": e[ '_id' ]
         }
         print( "Updating event "+self.id_str(e))
-#        self.event.update(query,values)
+        self.event.update(query,values)
 
     def update_user(self,mac='',values={}):
         """Update all user objects that match {mac} with {values} which defaults to {} but can be overridden"""
@@ -272,7 +286,7 @@ class MongoDriver:
             "mac": mac
         }
         print( "Updating user "+mac)
-#        self.user.update_many(query,values)
+        self.user.update_many(query,values)
 
     def whitelist(self):
         """Reads the whitelist collection for all objects, then transforms them into an array of mac addresses"""
